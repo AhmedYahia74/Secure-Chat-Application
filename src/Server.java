@@ -19,16 +19,11 @@ public class Server {
             System.out.println("Waiting for a client to connect...");
 
             while (true) {
-                Socket socket1 = serverSocket.accept();
-                System.out.println("First Client connected." + LocalDateTime.now());
+                Socket socket = serverSocket.accept();
+                System.out.println("Client connected." + LocalDateTime.now());
                 System.out.println("---------------------");
-                Socket socket2 = serverSocket.accept();
-                System.out.println("Second Client connected." + LocalDateTime.now());
-                System.out.println("---------------------");
-
                 //Thread to handle client messages
-                Thread client = new Thread(new CommunicationHandler(socket1, socket2));
-
+                Thread client = new Thread(new CommunicationHandler(socket));
                 client.start();
             }
 
