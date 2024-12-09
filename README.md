@@ -1,1 +1,1 @@
-# AhmedYahia74-Secure-Chat-Application
+# Secure-Chat-Application
