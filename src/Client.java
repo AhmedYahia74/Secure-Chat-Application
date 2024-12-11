@@ -2,12 +2,24 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 
-public class Client implements Runnable{
+import javax.crypto.SecretKey;
+
+public class Client implements Runnable {
     private String clientName = null;
     private Socket socket = null;
     private Scanner inputStream = null;
     private PrintWriter outputStream = null;
     private BufferedReader response = null;
+    private static SecretKey key;
+    //h4el elklam da
+    {
+        try {
+            key = AES_Enryption.GenerateSecretKey(128);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    AES_Enryption aes = new AES_Enryption();
 
     public Client(String hostName, int portNumber, String clientName) {
 
@@ -19,7 +31,7 @@ public class Client implements Runnable{
                 System.out.println("you're now connected!");
                 inputStream = new Scanner(System.in);
                 outputStream = new PrintWriter(socket.getOutputStream());
-                response=new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                response = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 outputStream.println(clientName);
                 break;
             } catch (IOException e) {
@@ -31,24 +43,23 @@ public class Client implements Runnable{
     @Override
     public void run() {
 
-
-        //Sender
+        // Sender
         Thread sender = getSender();
 
-        try { //Get the response
+        try { // Get the response
             response = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
-        //Receiver
+        // Receiver
         Thread receiver = getReceiver();
 
         sender.start();
         receiver.start();
 
         try {
-            //Wait until sender & receiver thread is done
+            // Wait until sender & receiver thread is done
             sender.join();
             receiver.join();
             inputStream.close();
@@ -64,8 +75,15 @@ public class Client implements Runnable{
             String line = "";
             while (true) {
                 line = inputStream.nextLine();
-                outputStream.println(line+"\n");
-                outputStream.flush(); //Prevents buffering of the message. Sends out the message immediately
+                outputStream.println(line + "\n");
+                //hs2l ahmed
+                try {
+                    line = aes.encrpytMsg(line, key);
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                outputStream.flush(); // Prevents buffering of the message. Sends out the message immediately
             }
         });
     }
@@ -78,16 +96,19 @@ public class Client implements Runnable{
                     line = response.readLine();
                     if (line == null)
                         break;
+                    line = aes.decryptMsg(line, key);
                     System.out.println(line);
                 } catch (IOException e) {
                     System.err.println(e.getMessage());
                     System.exit(-1);
                     break;
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
                 }
             }
         });
     }
-
 
     public static void main(String[] args) {
         String userName = null;
@@ -111,14 +132,12 @@ public class Client implements Runnable{
         in.reset();
         int port = 8888;
         try {
-            Thread cl = new Thread(new Client("localhost", port,userName));
+            Thread cl = new Thread(new Client("localhost", port, userName));
             cl.start();
         } catch (RuntimeException e) {
             System.err.println(e.getMessage());
             System.exit(-1);
         }
-
-
 
     }
 
