@@ -50,8 +50,23 @@ public class AES_Enryption {
     }
 
     private byte[] decode(String data) {
-        System.out.println(data);
-        return Base64.getDecoder().decode(data);
+        if (data == null || data.isEmpty()) {
+            throw new IllegalArgumentException("Input data is null or empty");
+        }
+       
+        String str = data.replaceAll("[^A-Za-z0-9+/=]", "");
+        while (str.length() % 4 != 0) {
+            str += "=";
+        }
+        System.err.println("Decoded String: " + str+" Length: "+str.length());
+        try {
+            // Attempt to decode sanitized data
+            return Base64.getDecoder().decode(str);
+        } catch (IllegalArgumentException e) {
+            // Log the issue and rethrow for debugging or handling further up
+            System.err.println("Failed to decode Base64 string: " + e.getMessage());
+            throw e; // Re-throw or handle it as needed
+        }
     }
 
     public String decryptMsg(String encryptedMsg, String secretKey, String IV) throws Exception {
@@ -90,7 +105,7 @@ public class AES_Enryption {
     //         // aes.init();
     //         String key = "rnLgcmZmVZDsTreCCiiryA==";
     //         String IV = "jQFIcwdbvVMRjjxk";
-    //         String encryptedMsg = aes.encrpytMsg("Hello World", key, IV);
+    //         String encryptedMsg = aes.encrpytMsg("  Hello world  ", key, IV);
     //         aes.decryptMsg(encryptedMsg, key, IV);
     //         aes.getSecretKey();
     //     } catch (Exception e) {
