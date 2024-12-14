@@ -12,7 +12,7 @@ public class Server {
     }
 
     public void startServer() {
-        try(ServerSocket serverSocket = new ServerSocket(portNumber)) {
+        try (ServerSocket serverSocket = new ServerSocket(portNumber)) {
             System.out.println("Server started!");
 
             System.out.println("Waiting for a client to connect...");
@@ -25,8 +25,6 @@ public class Server {
                 Thread client = new Thread(new CommunicationHandler(socket));
                 client.start();
             }
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

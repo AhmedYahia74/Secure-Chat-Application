@@ -1,3 +1,4 @@
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
@@ -12,6 +13,10 @@ public class CommunicationHandler implements Runnable {
     private Socket clientSocket;
     public  static List<CommunicationHandler> clients=new ArrayList<>();
     private CommunicationHandler client2=null;
+    private String key = "rnLgcmZmVZDsTreCCiiryA==";
+    private String IV = "jQFIcwdbvVMRjjxk";
+    AES_Enryption aes = new AES_Enryption();
+
 
     public CommunicationHandler(Socket clientSocket) {
         this.clientSocket = clientSocket;
@@ -36,6 +41,9 @@ public class CommunicationHandler implements Runnable {
                 if (!clientInputStream.ready())
                     continue;
                 inputMessageFromClient = clientInputStream.readLine();
+                if(!inputMessageFromClient.isBlank())
+                    inputMessageFromClient= aes.decryptMsg(inputMessageFromClient, key,IV);
+
                 if (client2 == null) {
                     try {
                         findClient(inputMessageFromClient);
@@ -58,7 +66,7 @@ public class CommunicationHandler implements Runnable {
 
             } catch (IOException e) {
                 throw new RuntimeException(e);
-            } catch (NoSuchElementException ignored) {
+            } catch (Exception ignored) {
 
             }
         }
@@ -76,7 +84,7 @@ public class CommunicationHandler implements Runnable {
             }
         }
         if (!flag) {
-            throw new RuntimeException("Client With username " + inputMessageFromClient + " Not Found!");
+            throw new RuntimeException("Client With username " + inputMessageFromClient + " Not Found");
         }
     }
 
@@ -84,7 +92,12 @@ public class CommunicationHandler implements Runnable {
         if (messageToReceiver.isBlank())
             return;
 
-        client2.clientOutputStream.println(name+": "+messageToReceiver);
+        try {
+            messageToReceiver = Client.aes.encrpytMsg(name + ": " + messageToReceiver, key,IV);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        client2.clientOutputStream.println(messageToReceiver);
         client2.clientOutputStream.flush();
     }
     @Override

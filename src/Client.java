@@ -1,65 +1,50 @@
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.net.Socket;
+import java.security.NoSuchAlgorithmException;
 import java.util.Scanner;
-
-import javax.crypto.SecretKey;
-
-public class Client implements Runnable {
+public class Client implements Runnable{
     private String clientName = null;
     private Socket socket = null;
     private Scanner inputStream = null;
     private PrintWriter outputStream = null;
     private BufferedReader response = null;
-    private static SecretKey key;
-    //h4el elklam da
-    {
-        try {
-            key = AES_Enryption.GenerateSecretKey(128);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    AES_Enryption aes = new AES_Enryption();
+    public static AES_Enryption aes = new AES_Enryption();
+    private String key = "rnLgcmZmVZDsTreCCiiryA==";
+    private String IV = "jQFIcwdbvVMRjjxk";
 
     public Client(String hostName, int portNumber, String clientName) {
-
         this.clientName = clientName;
-
         while (true) {
             try {
                 socket = new Socket(hostName, portNumber);
                 System.out.println("you're now connected!");
                 inputStream = new Scanner(System.in);
                 outputStream = new PrintWriter(socket.getOutputStream());
-                response = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                response=new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 outputStream.println(clientName);
+                outputStream.flush();
                 break;
             } catch (IOException e) {
                 System.out.println(e);
             }
         }
     }
-
     @Override
     public void run() {
-
-        // Sender
+        //Sender
         Thread sender = getSender();
-
-        try { // Get the response
+        try { //Get the response
             response = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        // Receiver
+        //Receiver
         Thread receiver = getReceiver();
-
         sender.start();
         receiver.start();
-
         try {
-            // Wait until sender & receiver thread is done
+            //Wait until sender & receiver thread is done
             sender.join();
             receiver.join();
             inputStream.close();
@@ -69,25 +54,24 @@ public class Client implements Runnable {
             throw new RuntimeException(e);
         }
     }
-
     public Thread getSender() {
         return new Thread(() -> {
             String line = "";
             while (true) {
                 line = inputStream.nextLine();
-                outputStream.println(line + "\n");
-                //hs2l ahmed
+                if(line==null)
+                    continue;
                 try {
-                    line = aes.encrpytMsg(line, key);
+                    if(!line.isBlank())
+                        line = aes.encrpytMsg(line, key,IV);
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-                outputStream.flush(); // Prevents buffering of the message. Sends out the message immediately
+                outputStream.println(line);
+                outputStream.flush(); //Prevents buffering of the message. Sends out the message immediately
             }
         });
     }
-
     public Thread getReceiver() {
         return new Thread(() -> {
             String line = "";
@@ -96,20 +80,17 @@ public class Client implements Runnable {
                     line = response.readLine();
                     if (line == null)
                         break;
-                    line = aes.decryptMsg(line, key);
+                    if(!line.isBlank())
+                        line = aes.decryptMsg(line, key,IV);
                     System.out.println(line);
-                } catch (IOException e) {
+                } catch (Exception e) {
                     System.err.println(e.getMessage());
                     System.exit(-1);
                     break;
-                } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
                 }
             }
         });
     }
-
     public static void main(String[] args) {
         String userName = null;
         Scanner in = new Scanner(System.in);
@@ -117,12 +98,11 @@ public class Client implements Runnable {
         while (true) {
             userName = in.nextLine();
             if (userName.isBlank()) {
-                System.out.println("Name Cannot be blank!");
+                System.out.println("Name Cannot be blank");
                 continue;
             }
-
             if (findClient(userName)) {
-                System.out.println("Name Found already!");
+                System.out.println("Name Found already");
                 continue;
             }
             break;
@@ -132,15 +112,13 @@ public class Client implements Runnable {
         in.reset();
         int port = 8888;
         try {
-            Thread cl = new Thread(new Client("localhost", port, userName));
+            Thread cl = new Thread(new Client("localhost", port,userName));
             cl.start();
         } catch (RuntimeException e) {
             System.err.println(e.getMessage());
             System.exit(-1);
         }
-
     }
-
     private static boolean findClient(String userName) {
         boolean flag = false;
         for (int i = 0; i < CommunicationHandler.clients.size(); i++) {
@@ -150,7 +128,6 @@ public class Client implements Runnable {
         }
         return false;
     }
-
     public String getClientName() {
         return clientName;
     }
