@@ -43,19 +43,18 @@ public class CommunicationHandler implements Runnable {
                 inputMessageFromClient = clientInputStream.readLine();
                 if(!inputMessageFromClient.isBlank())
                     inputMessageFromClient= aes.decryptMsg(inputMessageFromClient, key,IV);
-
+                else
+                    continue;
+                System.out.println(inputMessageFromClient);
                 if (client2 == null) {
                     try {
                         findClient(inputMessageFromClient);
-                        clientOutputStream.println("Connected Successfully With " + client2.name);
+                        clientOutputStream.println(aes.encrpytMsg("Connected Successfully With " + client2.name,key,IV));
                         clientOutputStream.flush();
                     } catch (Exception ex) {
-                        clientOutputStream.println(ex.getMessage());
-                        clientInputStream.readLine();
-                        clientOutputStream.flush();
+
                     }
                 } else if (inputMessageFromClient.equals("<Exit>")){
-                    clientInputStream.readLine();
                     clientOutputStream.println("you are Exited Successfully");
                     clientOutputStream.flush();
                     client2=null;

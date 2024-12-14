@@ -64,10 +64,10 @@ public class Client implements Runnable{
                 try {
                     if(!line.isBlank())
                         line = aes.encrpytMsg(line, key,IV);
+                    outputStream.println(line);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                outputStream.println(line);
                 outputStream.flush(); //Prevents buffering of the message. Sends out the message immediately
             }
         });
@@ -80,6 +80,7 @@ public class Client implements Runnable{
                     line = response.readLine();
                     if (line == null)
                         break;
+                    //System.out.println(line);
                     if(!line.isBlank())
                         line = aes.decryptMsg(line, key,IV);
                     System.out.println(line);

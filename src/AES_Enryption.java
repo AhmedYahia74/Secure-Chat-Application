@@ -39,9 +39,9 @@ public class AES_Enryption {
         GCMParameterSpec spec = new GCMParameterSpec(T_LEN, this.IV);
         encryptionCipher.init(Cipher.ENCRYPT_MODE, key, spec);
         byte[] encrpytedBytes = encryptionCipher.doFinal(byteMsg);
-        System.out.println("Message is Sucessfully encrypted!...");
+       // System.out.println("Message is Sucessfully encrypted!...");
         String encodeEncryptedBytes = encode(encrpytedBytes);
-        System.out.println("Encrypted Message: " + encodeEncryptedBytes);
+        //System.out.println("Encrypted Message: " + encodeEncryptedBytes);
         return encodeEncryptedBytes;
     }
 
@@ -50,7 +50,6 @@ public class AES_Enryption {
     }
 
     private byte[] decode(String data) {
-        System.out.println(data);
         return Base64.getDecoder().decode(data);
     }
 
@@ -64,8 +63,8 @@ public class AES_Enryption {
         decryptionCipher.init(Cipher.DECRYPT_MODE, key, spec);
         byte[] decryptedBytes = decryptionCipher.doFinal(byteMsg);
         String decryptedMessage = new String(decryptedBytes);
-        System.out.println("The Message Decrypted Sucessfully!....");
-        System.out.println("Decrypted Message: " + decryptedMessage);
+        // System.out.println("The Message Decrypted Sucessfully!....");
+        //System.out.println("Decrypted Message: " + decryptedMessage);
         return decryptedMessage;
 
     }
@@ -74,7 +73,7 @@ public class AES_Enryption {
         KeyGenerator generator = KeyGenerator.getInstance("AES/GCM/NoPadding");
         generator.init(keySize);
         SecretKey key = generator.generateKey();
-        System.out.println("Secrect key" + key.getEncoded());
+//        System.out.println("Secrect key" + key.getEncoded());
         return key;
     }
 
