@@ -12,36 +12,24 @@ public class AES_Enryption {
     private int T_LEN = 128;
     private byte[] IV;
 
-    private void initFromStrings(String secretKey, String IV) {
+    private void initFromStrings(String secretKey) {
         key = new SecretKeySpec(decode(secretKey), "AES");
-        this.IV = decode(IV);
+        IV = decode("WD9c+anls3zxlgoy");
     }
 
-    public String encrpytMsgOld(String message, SecretKey key) throws Exception {
-
-        byte[] byteMsg = message.getBytes();
-        Cipher encryptionCipher = Cipher.getInstance("AES/GCM/NoPadding");
-        encryptionCipher.init(Cipher.ENCRYPT_MODE, key);
-        IV = encryptionCipher.getIV();
-        byte[] encrpytedBytes = encryptionCipher.doFinal(byteMsg);
-        System.out.println("Message is Sucessfully encrypted!...");
-        String encodeEncryptedBytes = encode(encrpytedBytes);
-        System.out.println("Encrypted Message: " + encodeEncryptedBytes);
-        return encodeEncryptedBytes;
-    }
-
-    public String encrpytMsg(String message, String secretKey, String IV) throws Exception {
+  
+    public String encrpytMsg(String message, String secretKey) throws Exception {
         if(message.isBlank())
             return "";
-        initFromStrings(secretKey, IV);
+        initFromStrings(secretKey);
         byte[] byteMsg = message.getBytes();
         Cipher encryptionCipher = Cipher.getInstance("AES/GCM/NoPadding");
-        GCMParameterSpec spec = new GCMParameterSpec(T_LEN, this.IV);
+        GCMParameterSpec spec = new GCMParameterSpec(T_LEN, IV);
         encryptionCipher.init(Cipher.ENCRYPT_MODE, key, spec);
         byte[] encrpytedBytes = encryptionCipher.doFinal(byteMsg);
-       // System.out.println("Message is Sucessfully encrypted!...");
+        // System.out.println("Message is Sucessfully encrypted!...");
         String encodeEncryptedBytes = encode(encrpytedBytes);
-        //System.out.println("Encrypted Message: " + encodeEncryptedBytes);
+        // System.out.println("Encrypted Message: " + encodeEncryptedBytes);
         return encodeEncryptedBytes;
     }
 
@@ -53,18 +41,18 @@ public class AES_Enryption {
         return Base64.getDecoder().decode(data);
     }
 
-    public String decryptMsg(String encryptedMsg, String secretKey, String IV) throws Exception {
+    public String decryptMsg(String encryptedMsg, String secretKey) throws Exception {
         if(encryptedMsg.isBlank())
             return "";
-        initFromStrings(secretKey, IV);
+        initFromStrings(secretKey);
         byte[] byteMsg = decode(encryptedMsg);
         Cipher decryptionCipher = Cipher.getInstance("AES/GCM/NoPadding");
-        GCMParameterSpec spec = new GCMParameterSpec(T_LEN, this.IV);
+        GCMParameterSpec spec = new GCMParameterSpec(T_LEN, IV);
         decryptionCipher.init(Cipher.DECRYPT_MODE, key, spec);
         byte[] decryptedBytes = decryptionCipher.doFinal(byteMsg);
         String decryptedMessage = new String(decryptedBytes);
         // System.out.println("The Message Decrypted Sucessfully!....");
-        //System.out.println("Decrypted Message: " + decryptedMessage);
+        // System.out.println("Decrypted Message: " + decryptedMessage);
         return decryptedMessage;
 
     }
@@ -82,18 +70,5 @@ public class AES_Enryption {
         System.err.println("IV: " + encode(IV));
     }
 
-    // public static void main(String[] args) {
-    //     AES_Enryption aes = new AES_Enryption();
-    //     try {
-
-    //         // aes.init();
-    //         String key = "rnLgcmZmVZDsTreCCiiryA==";
-    //         String IV = "jQFIcwdbvVMRjjxk";
-    //         String encryptedMsg = aes.encrpytMsg("Hello World", key, IV);
-    //         aes.decryptMsg(encryptedMsg, key, IV);
-    //         aes.getSecretKey();
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //     }
-    // }
+   
 }
