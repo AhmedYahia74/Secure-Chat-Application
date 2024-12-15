@@ -9,7 +9,7 @@ import java.util.Base64;
 
 import javax.crypto.Cipher;
 
-public class RSA {
+public class RSA implements Encryption{
     private PrivateKey privateKey;
     private PublicKey publicKey;
     //for testing
@@ -45,15 +45,16 @@ public class RSA {
         }
     }
 
+    @Override
     public String encryptMsg(String message, String publicKey_string) throws Exception {
         get_public_key(publicKey_string);
         byte[] byteMsg = message.getBytes();
         Cipher encryptionCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         encryptionCipher.init(Cipher.ENCRYPT_MODE, publicKey);
         byte[] encrpytedBytes = encryptionCipher.doFinal(byteMsg);
-        // System.out.println("Message is Sucessfully encrypted!...");
+         System.out.println("Message is Sucessfully encrypted!...");
         String encodeEncryptedBytes = encode(encrpytedBytes);
-        // System.out.println("Encrypted Message: " + encodeEncryptedBytes);
+         System.out.println("Encrypted Message: " + encodeEncryptedBytes);
         return encodeEncryptedBytes;
     }
 
@@ -61,15 +62,16 @@ public class RSA {
         return Base64.getEncoder().encodeToString(data);
     }
 
+    @Override
     public String decryptMsg(String encryptedMsg, String privateKey_string) throws Exception {
         get_private_key(privateKey_string);
         byte[] byteMsg = decode(encryptedMsg);
         Cipher decryptionCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         decryptionCipher.init(Cipher.DECRYPT_MODE, privateKey);
         byte[] decryptedBytes = decryptionCipher.doFinal(byteMsg);
-        // System.out.println("Message is Sucessfully decrypted!...");
+         System.out.println("Message is Sucessfully decrypted!...");
         String decryptedMessage = new String(decryptedBytes, "UTF-8");
-        // System.out.println("Decrypted Message: " + decryptedMessage);
+         System.out.println("Decrypted Message: " + decryptedMessage);
         return decryptedMessage;
     }
 

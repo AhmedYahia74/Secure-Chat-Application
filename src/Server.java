@@ -2,13 +2,26 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalDateTime;
+import java.util.Scanner;
 
 public class Server {
 
     private final int portNumber;
+    public static Encryption encryption;
 
     public Server(int portNUmber) throws IOException {
         this.portNumber = portNUmber;
+        System.out.println("Choose an Encryption algorithm");
+        System.out.println("1- RSA");
+        System.out.println("2- AES");
+        Scanner in =new Scanner(System.in);
+        int n=in.nextInt();
+        if(n==1){
+            Server.encryption=new RSA();
+        }
+        else
+            Server.encryption=new AES_Enryption();
+        System.out.println(encryption);
     }
 
     public void startServer() {

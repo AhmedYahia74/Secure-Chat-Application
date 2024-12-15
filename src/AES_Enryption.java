@@ -6,17 +6,18 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-public class AES_Enryption {
+public class AES_Enryption implements Encryption{
     private int key_size = 128;
     private SecretKey key;
     private int T_LEN = 128;
     private byte[] IV;
+    private final String Iv = "jQFIcwdbvVMRjjxk";
 
     private void initFromStrings(String secretKey, String IV) {
         key = new SecretKeySpec(decode(secretKey), "AES");
         this.IV = decode(IV);
     }
-
+    
     public String encrpytMsgOld(String message, SecretKey key) throws Exception {
 
         byte[] byteMsg = message.getBytes();
@@ -30,18 +31,19 @@ public class AES_Enryption {
         return encodeEncryptedBytes;
     }
 
-    public String encrpytMsg(String message, String secretKey, String IV) throws Exception {
+    @Override
+    public String encryptMsg(String message, String secretKey) throws Exception {
         if(message.isBlank())
             return "";
-        initFromStrings(secretKey, IV);
+        initFromStrings(secretKey, Iv);
         byte[] byteMsg = message.getBytes();
         Cipher encryptionCipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec spec = new GCMParameterSpec(T_LEN, this.IV);
         encryptionCipher.init(Cipher.ENCRYPT_MODE, key, spec);
         byte[] encrpytedBytes = encryptionCipher.doFinal(byteMsg);
-       // System.out.println("Message is Sucessfully encrypted!...");
+        System.out.println("Message is Sucessfully encrypted!...");
         String encodeEncryptedBytes = encode(encrpytedBytes);
-        //System.out.println("Encrypted Message: " + encodeEncryptedBytes);
+        System.out.println("Encrypted Message: " + encodeEncryptedBytes);
         return encodeEncryptedBytes;
     }
 
@@ -53,18 +55,19 @@ public class AES_Enryption {
         return Base64.getDecoder().decode(data);
     }
 
-    public String decryptMsg(String encryptedMsg, String secretKey, String IV) throws Exception {
+    @Override
+    public String decryptMsg(String encryptedMsg, String secretKey) throws Exception {
         if(encryptedMsg.isBlank())
             return "";
-        initFromStrings(secretKey, IV);
+        initFromStrings(secretKey, Iv);
         byte[] byteMsg = decode(encryptedMsg);
         Cipher decryptionCipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec spec = new GCMParameterSpec(T_LEN, this.IV);
         decryptionCipher.init(Cipher.DECRYPT_MODE, key, spec);
         byte[] decryptedBytes = decryptionCipher.doFinal(byteMsg);
         String decryptedMessage = new String(decryptedBytes);
-        // System.out.println("The Message Decrypted Sucessfully!....");
-        //System.out.println("Decrypted Message: " + decryptedMessage);
+         System.out.println("The Message Decrypted Sucessfully!....");
+        System.out.println("Decrypted Message: " + decryptedMessage);
         return decryptedMessage;
 
     }
