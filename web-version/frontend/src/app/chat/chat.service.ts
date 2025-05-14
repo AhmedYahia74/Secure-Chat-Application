@@ -19,6 +19,7 @@ export class ChatService {
   private reconnectTimeout: any;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private personalMessageSubscription: any = null;
 
   constructor(private encryptionService: EncryptionService) {
     this.connect();
@@ -51,54 +52,83 @@ export class ChatService {
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.connectionStatus.next('Connected');
-
-          // Subscribe to personal messages
-          this.stompClient?.subscribe(`/user/${this.currentUser}/queue/messages`, (message: IMessage) => {
-            console.log('Received raw message:', message);
-            const msg = JSON.parse(message.body);
-            console.log('Parsed message:', msg);
-            try {
-              const decryptedContent = this.encryptionService.decryptMessage(
-                msg.encryptedContent,
-                msg.sender
-              );
-              console.log('Decrypted content:', decryptedContent);
-              const decryptedMsg = {
-                ...msg,
-                content: decryptedContent,
-                timestamp: new Date(),
-                isUser: msg.sender === this.currentUser
-              };
-              console.log('Final message object:', decryptedMsg);
-              const currentMessages = this.messageSubject.value;
-              console.log('Current messages before update:', currentMessages);
-              const updatedMessages = [...currentMessages, decryptedMsg];
-              console.log('Updated messages array:', updatedMessages);
-              this.messageSubject.next(updatedMessages);
-              console.log('Message subject updated with new value:', this.messageSubject.value);
-            } catch (error) {
-              console.error('Error processing message:', error);
-              console.error('Error details:', {
-                message: msg,
-                currentUser: this.currentUser,
-                error: error
-              });
-            }
-          });
-
+          
           // Subscribe to user list updates
           this.stompClient?.subscribe('/topic/users', (message: IMessage) => {
             console.log('Received user list update:', message);
-            const users = JSON.parse(message.body);
-            this.usersSubject.next(users);
+            let users;
+            try {
+              if (message.isBinaryBody) {
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(message.binaryBody);
+                console.log('Decoded binary user list:', text);
+                users = JSON.parse(text);
+              } else {
+                users = JSON.parse(message.body);
+              }
+              this.usersSubject.next(users);
+            } catch (error) {
+              console.error('Error processing user list:', error);
+            }
           });
 
           // Subscribe to public key updates
           this.stompClient?.subscribe('/topic/public-keys', (message: IMessage) => {
             console.log('Received public key update:', message);
-            const userData = JSON.parse(message.body);
-            if (userData.username !== this.currentUser) {
-              this.encryptionService.generateSharedKey(userData.publicKey, userData.username);
+            let userData;
+            try {
+              if (message.isBinaryBody) {
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(message.binaryBody);
+                console.log('Decoded binary public key:', text);
+                userData = JSON.parse(text);
+              } else {
+                userData = JSON.parse(message.body);
+              }
+              console.log('Parsed user data:', userData);
+              if (userData.username !== this.currentUser) {
+                this.encryptionService.generateSharedKey(userData.publicKey, userData.username);
+                console.log('Generated shared key for user:', userData.username);
+              }
+            } catch (error) {
+              console.error('Error processing public key update:', error);
+            }
+          });
+
+          // Subscribe to broadcast messages
+          this.stompClient?.subscribe('/topic/messages', (message: IMessage) => {
+            let msg;
+            try {
+              if (message.isBinaryBody) {
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(message.binaryBody);
+                msg = JSON.parse(text);
+              } else {
+                msg = JSON.parse(message.body);
+              }
+              // Only decrypt and display if this user is the receiver
+              if (msg.receiver === this.currentUser) {
+                // Always generate shared key using sender's public key from the message
+                console.log('Attempting to decrypt:', msg.encryptedContent, 'from sender:', msg.sender, 'with publicKey:', msg.senderPublicKey);
+                this.encryptionService.generateSharedKey(msg.senderPublicKey, msg.sender);
+                const decryptedContent = this.encryptionService.decryptMessage(
+                  msg.encryptedContent,
+                  msg.sender
+                );
+                console.log('Decrypted content:', decryptedContent);
+                const decryptedMsg = {
+                  ...msg,
+                  content: decryptedContent,
+                  timestamp: new Date(),
+                  isUser: false
+                };
+                const currentMessages = this.messageSubject.value;
+                console.log('Current messages:', currentMessages);
+                this.messageSubject.next([...currentMessages, decryptedMsg]);
+                console.log('All messages now:', this.messageSubject.value);
+              }
+            } catch (error) {
+              console.error('Error processing broadcast message:', error);
             }
           });
         },
@@ -160,6 +190,12 @@ export class ChatService {
       body: JSON.stringify({ username, publicKey }),
       headers: { 'content-type': 'application/json' }
     });
+
+    // Unsubscribe previous if exists
+    if (this.personalMessageSubscription) {
+      this.personalMessageSubscription.unsubscribe();
+    }
+    
   }
 
   connectToUser(username: string): void {
@@ -194,16 +230,24 @@ export class ChatService {
         content: content.trim(),
         encryptedContent,
         senderPublicKey: this.encryptionService.getPublicKey(),
-        timestamp: new Date()
+        timestamp: new Date(),
+        isUser: true
       };
 
       console.log('Sending message:', msg);
+      console.log('Sender public key:', this.encryptionService.getPublicKey());
+      console.log('Sender public key in message:', msg.senderPublicKey);
       this.stompClient.publish({
         destination: '/app/chat',
         body: JSON.stringify(msg),
         headers: { 'content-type': 'application/json' }
       });
       console.log('Message sent successfully');
+
+      // Add message to local messages array
+      const currentMessages = this.messageSubject.value;
+      this.messageSubject.next([...currentMessages, msg]);
+      console.log('Added message to local messages:', this.messageSubject.value);
     } catch (error) {
       console.error('Error sending message:', error);
       this.connectionStatus.next('Error');
