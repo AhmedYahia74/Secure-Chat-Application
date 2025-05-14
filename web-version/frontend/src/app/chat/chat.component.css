@@ -7,7 +7,8 @@
   left: 0;
 }
 
-body, html {
+body,
+html {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -312,4 +313,13 @@ body, html {
   display: flex;
   flex-direction: column;
 }
-  
+
+.debug-info {
+  color: #8B8B8B;
+  font-size: 12px;
+  padding: 10px;
+  text-align: center;
+  background-color: rgba(139, 139, 139, 0.1);
+  border-radius: 4px;
+  margin: 10px 0;
+}

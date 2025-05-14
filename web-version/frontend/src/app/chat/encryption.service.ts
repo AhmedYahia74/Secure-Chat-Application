@@ -1,50 +1,218 @@
 import { Injectable } from '@angular/core';
-import * as CryptoJS from 'crypto-js';
-import { Buffer } from 'buffer';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class EncryptionService {
-  private privateKey: string = '';
-  private publicKey: string = '';
-  private sharedKeys: Map<string, string> = new Map();
+  private keyPair: CryptoKeyPair | null = null;
+  private sharedKeys: Map<string, CryptoKey> = new Map();
+  private publicKeyJwk: JsonWebKey | null = null;
 
   constructor() {
-    this.generateKeyPair();
+    this.initializeKeyPair();
   }
 
-  private generateKeyPair(): void {
-    // Generate a random private key
-    this.privateKey = CryptoJS.lib.WordArray.random(32).toString();
-    // In a real implementation, this would use proper DH key generation
-    this.publicKey = CryptoJS.SHA256(this.privateKey).toString();
+  private async initializeKeyPair(): Promise<void> {
+    this.keyPair = await this.generateECDHKeyPair();
+    this.publicKeyJwk = await this.exportPublicKey(this.keyPair.publicKey);
   }
 
-  getPublicKey(): string {
-    return this.publicKey;
+  // 1. Generate ECDH key pair (public and private keys)
+  async generateECDHKeyPair(): Promise<CryptoKeyPair> {
+    return await crypto.subtle.generateKey(
+      {
+        name: 'ECDH',
+        namedCurve: 'P-256', // ECDH P-256 curve
+      },
+      true, // extractable = true, meaning we can export the key
+      ['deriveKey'] // Only allow deriving keys with this key
+    );
   }
 
-  generateSharedKey(peerPublicKey: string, peerUsername: string): void {
-    // In a real implementation, this would use proper DH key exchange
-    const sharedKey = CryptoJS.SHA256(this.privateKey + peerPublicKey).toString();
-    this.sharedKeys.set(peerUsername, sharedKey);
+  // 2. Export the public key to send to others
+  async exportPublicKey(publicKey: CryptoKey): Promise<JsonWebKey> {
+    return await crypto.subtle.exportKey('jwk', publicKey); // Export the public key as JSON
   }
 
-  encryptMessage(message: string, peerUsername: string): string {
-    const sharedKey = this.sharedKeys.get(peerUsername);
-    if (!sharedKey) {
-      throw new Error('No shared key found for peer');
+  // 3. Import another user's public key from JSON (to derive shared secret)
+  async importPublicKey(jwk: JsonWebKey): Promise<CryptoKey> {
+    console.log('Importing public key:', jwk);
+    return await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      []
+    );
+  }
+
+  // 4. Derive a shared AES key using your private key and their public key
+  async deriveSharedKey(
+    myPrivateKey: CryptoKey,
+    theirPublicKey: CryptoKey
+  ): Promise<CryptoKey> {
+    console.log('Deriving shared key with:', {
+      hasPrivateKey: !!myPrivateKey,
+      hasPublicKey: !!theirPublicKey,
+      privateKeyType: myPrivateKey?.type,
+      publicKeyType: theirPublicKey?.type,
+      privateKeyAlgorithm: myPrivateKey?.algorithm,
+      publicKeyAlgorithm: theirPublicKey?.algorithm
+    });
+
+    try {
+      const sharedKey = await crypto.subtle.deriveKey(
+        {
+          name: 'ECDH',
+          public: theirPublicKey,
+        },
+        myPrivateKey,
+        {
+          name: 'AES-GCM',
+          length: 256,
+        },
+        false,
+        ['encrypt', 'decrypt']
+      );
+
+      console.log('Successfully derived shared key:', {
+        type: sharedKey.type,
+        algorithm: sharedKey.algorithm,
+        extractable: sharedKey.extractable,
+        usages: sharedKey.usages
+      });
+
+      return sharedKey;
+    } catch (error) {
+      console.error('Error deriving shared key:', error);
+      throw error;
     }
-    return CryptoJS.AES.encrypt(message, sharedKey).toString();
   }
 
-  decryptMessage(encryptedMessage: string, peerUsername: string): string {
-    const sharedKey = this.sharedKeys.get(peerUsername);
-    if (!sharedKey) {
-      throw new Error('No shared key found for peer');
-    }
-    const bytes = CryptoJS.AES.decrypt(encryptedMessage, sharedKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+  // 5. Encrypt a message with the shared AES key and an IV (Initialization Vector)
+  async encryptMessage(
+    plainText: string,
+    sharedKey: CryptoKey
+  ): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
+    console.log('Encrypting message:', {
+      plainTextLength: plainText.length,
+      hasSharedKey: !!sharedKey
+    });
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plainText);
+
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      sharedKey,
+      encoded
+    );
+
+    console.log('Encryption result:', {
+      ivLength: iv.length,
+      ciphertextLength: encrypted.byteLength
+    });
+
+    return {
+      iv,
+      ciphertext: new Uint8Array(encrypted),
+    };
   }
-} 
+
+  // 6. Decrypt a message with the shared AES key and the IV (Initialization Vector)
+  async decryptMessage(
+    encrypted: Uint8Array,
+    iv: Uint8Array,
+    sharedKey: CryptoKey
+  ): Promise<string> {
+    console.log('Decrypting message:', {
+      encryptedLength: encrypted.length,
+      ivLength: iv.length,
+      hasSharedKey: !!sharedKey,
+      encryptedType: encrypted.constructor.name,
+      ivType: iv.constructor.name,
+      sharedKeyType: sharedKey.constructor.name
+    });
+
+    if (!encrypted || encrypted.length === 0) {
+      throw new Error('Encrypted data is empty or invalid');
+    }
+
+    if (!iv || iv.length !== 12) {
+      throw new Error(`Invalid IV length: ${iv?.length}, expected 12`);
+    }
+
+    if (!sharedKey) {
+      throw new Error('Shared key is missing');
+    }
+
+    try {
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        sharedKey,
+        encrypted
+      );
+
+      console.log('Decryption successful, decoded length:', decrypted.byteLength);
+      return new TextDecoder().decode(decrypted);
+    } catch (error) {
+      console.error('Decryption error details:', {
+        error,
+        encryptedType: encrypted.constructor.name,
+        ivType: iv.constructor.name,
+        sharedKeyType: sharedKey.constructor.name,
+        encryptedLength: encrypted.length,
+        ivLength: iv.length
+      });
+      throw error;
+    }
+  }
+
+  // New methods for key management
+  getPublicKey(): JsonWebKey {
+    if (!this.publicKeyJwk) {
+      throw new Error('Public key not initialized');
+    }
+    return this.publicKeyJwk;
+  }
+
+  async generateSharedKey(publicKeyJwk: JsonWebKey, username: string): Promise<void> {
+    console.log('Generating shared key for user:', username, 'with public key:', publicKeyJwk);
+    if (!this.keyPair?.privateKey) {
+      throw new Error('Private key not initialized');
+    }
+
+    try {
+      const theirPublicKey = await this.importPublicKey(publicKeyJwk);
+      console.log('Imported public key for user:', username, {
+        type: theirPublicKey.type,
+        algorithm: theirPublicKey.algorithm,
+        extractable: theirPublicKey.extractable,
+        usages: theirPublicKey.usages
+      });
+
+      const sharedKey = await this.deriveSharedKey(this.keyPair.privateKey, theirPublicKey);
+      console.log('Derived shared key for user:', username, {
+        type: sharedKey.type,
+        algorithm: sharedKey.algorithm,
+        extractable: sharedKey.extractable,
+        usages: sharedKey.usages
+      });
+
+      this.sharedKeys.set(username, sharedKey);
+      console.log('Stored shared key for user:', username);
+    } catch (error) {
+      console.error('Error generating shared key:', error);
+      throw error;
+    }
+  }
+
+  getSharedKey(username: string): CryptoKey | undefined {
+    const key = this.sharedKeys.get(username);
+    console.log('Retrieving shared key for user:', username, {
+      keyFound: !!key,
+      keyType: key?.type,
+      keyAlgorithm: key?.algorithm
+    });
+    return key;
+  }
+}

@@ -18,37 +18,51 @@
     <div class="chat-layout">
       <div class="users-list">
         <h3>Online Users</h3>
-        <div class="user-item" 
-             *ngFor="let user of users"
-             [class.selected]="user.username === selectedUser"
-             (click)="connectToUser(user.username)">
+        <div class="user-item" *ngFor="let user of users" [class.selected]="user.username === selectedUser"
+          (click)="connectToUser(user.username)">
           {{ user.username }}
         </div>
       </div>
 
       <div class="chat-main">
         <div class="chat-messages">
-          <div *ngFor="let message of messages" 
-               [class]="'message ' + (message.isUser ? 'user-message' : 'bot-message')">
+          <!-- Debug info -->
+          <div *ngIf="messages.length === 0" class="debug-info">
+            No messages to display
+          </div>
+          <div *ngIf="messages.length > 0" class="debug-info">
+            {{messages.length}} messages available
+          </div>
+
+          <!-- Message debug -->
+          <div class="debug-info">
+            <div>Messages array length: {{messages.length}}</div>
+            <div>Messages array: {{messages | json}}</div>
+          </div>
+
+          <div *ngFor="let message of messages; let i = index"
+            [class]="'message ' + (message.isUser ? 'user-message' : 'bot-message')">
             <div class="message-content">
               <div class="message-sender">{{ message.sender }}</div>
               <div class="message-text">{{message.content}}</div>
               <div class="message-time">{{message.timestamp | date:'shortTime'}}</div>
+              <!-- Message debug -->
+              <div class="debug-info" style="font-size: 10px;">
+                Message {{i}}: {{message | json}}
+              </div>
             </div>
           </div>
         </div>
-        
+
         <div class="chat-input">
-          <input type="text" 
-                 [(ngModel)]="content" 
-                 (keyup.enter)="sendMessage()" 
-                 [disabled]="!selectedUser"
-                 placeholder="{{ selectedUser ? 'Type your message...' : 'Select a user to chat with' }}"
-                 class="message-input">
+          <input type="text" [(ngModel)]="content" (keyup.enter)="sendMessage()" [disabled]="!selectedUser"
+            placeholder="{{ selectedUser ? 'Type your message...' : 'Select a user to chat with' }}"
+            class="message-input">
           <button (click)="sendMessage()" [disabled]="!content.trim() || !selectedUser">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
             </svg>
           </button>
         </div>
@@ -56,4 +70,3 @@
     </div>
   </div>
 </div>
-  
