@@ -1,43 +1,58 @@
 <div class="chat-container">
   <div *ngIf="!showChat" class="username-container">
-    <h2>Welcome to Chat</h2>
+    <h2>Welcome to Secure Chat</h2>
     <div class="error" *ngIf="error">{{ error }}</div>
     <div class="input-group">
       <label>Enter your username:</label>
-      <input [(ngModel)]="sender" placeholder="Username" (keyup.enter)="startChat()" />
+      <input [(ngModel)]="username" placeholder="Username" (keyup.enter)="startChat()" />
       <button (click)="startChat()">Start Chatting</button>
     </div>
   </div>
 
   <div *ngIf="showChat" class="chat-interface">
     <div class="chat-header">
-      <h2>Chat as {{ sender }}</h2>
+      <h2>Chat as {{ username }}</h2>
       <div class="status">Status: {{ status }}</div>
     </div>
-    
-    <div class="chat-messages">
-      <div *ngFor="let message of messages" 
-           [class]="'message ' + (message.isUser ? 'user-message' : 'bot-message')">
-        <div class="message-content">
-          <div class="message-sender">{{ message.sender }}</div>
-          <div class="message-text">{{message.content}}</div>
-          <div class="message-time">{{message.timestamp | date:'shortTime'}}</div>
+
+    <div class="chat-layout">
+      <div class="users-list">
+        <h3>Online Users</h3>
+        <div class="user-item" 
+             *ngFor="let user of users"
+             [class.selected]="user.username === selectedUser"
+             (click)="connectToUser(user.username)">
+          {{ user.username }}
         </div>
       </div>
-    </div>
-    
-    <div class="chat-input">
-      <input type="text" 
-             [(ngModel)]="content" 
-             (keyup.enter)="sendMessage()" 
-             placeholder="Type your message..."
-             class="message-input">
-      <button (click)="sendMessage()" [disabled]="!content.trim()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
+
+      <div class="chat-main">
+        <div class="chat-messages">
+          <div *ngFor="let message of messages" 
+               [class]="'message ' + (message.isUser ? 'user-message' : 'bot-message')">
+            <div class="message-content">
+              <div class="message-sender">{{ message.sender }}</div>
+              <div class="message-text">{{message.content}}</div>
+              <div class="message-time">{{message.timestamp | date:'shortTime'}}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="chat-input">
+          <input type="text" 
+                 [(ngModel)]="content" 
+                 (keyup.enter)="sendMessage()" 
+                 [disabled]="!selectedUser"
+                 placeholder="{{ selectedUser ? 'Type your message...' : 'Select a user to chat with' }}"
+                 class="message-input">
+          <button (click)="sendMessage()" [disabled]="!content.trim() || !selectedUser">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

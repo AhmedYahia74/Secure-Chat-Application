@@ -271,4 +271,45 @@ body, html {
 .typing-indicator {
   display: none;
 }
+
+.chat-layout {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+
+.users-list {
+  width: 250px;
+  background-color: #1B4353;
+  border-right: 1px solid #2B5363;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.users-list h3 {
+  color: #ffffff;
+  margin: 0 0 20px 0;
+  font-size: 18px;
+}
+
+.user-item {
+  padding: 12px 15px;
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.user-item:hover {
+  background-color: #2B5363;
+}
+
+.user-item.selected {
+  background-color: #4CAF50;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
   

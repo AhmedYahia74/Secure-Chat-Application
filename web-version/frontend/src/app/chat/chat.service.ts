@@ -1,18 +1,26 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { Client, IMessage } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+import { EncryptionService } from './encryption.service';
+import { Message, User } from './models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ChatService {
   private stompClient: Client | null = null;
-  private messageSubject = new BehaviorSubject<{ sender: string; content: string }[]>([]);
+  private messageSubject = new BehaviorSubject<Message[]>([]);
   private connectionStatus = new BehaviorSubject<string>('Disconnected');
+  private usersSubject = new BehaviorSubject<User[]>([]);
+  private currentUser: string = '';
+  private currentReceiver: string = '';
   private isConnecting = false;
   private reconnectTimeout: any;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
 
-  constructor() {
+  constructor(private encryptionService: EncryptionService) {
     this.connect();
   }
 
@@ -25,8 +33,13 @@ export class ChatService {
       this.isConnecting = true;
       console.log('Attempting to connect to WebSocket...');
       
+      const socket = new SockJS('http://localhost:8080/chat');
+      
       this.stompClient = new Client({
-        brokerURL: 'ws://localhost:8080/chat',
+        webSocketFactory: () => socket,
+        connectHeaders: {
+          'heart-beat': '10000,10000'
+        },
         debug: (str) => {
           console.log('STOMP Debug:', str);
         },
@@ -36,32 +49,63 @@ export class ChatService {
         onConnect: () => {
           console.log('Connected to WebSocket');
           this.isConnecting = false;
+          this.reconnectAttempts = 0;
           this.connectionStatus.next('Connected');
-          this.stompClient?.subscribe('/topic/messages', (message: IMessage) => {
-            console.log('Received message:', message);
-            // decrypt
+          
+          // Subscribe to personal messages
+          this.stompClient?.subscribe(`/user/${this.currentUser}/queue/messages`, (message: IMessage) => {
+            console.log('Received raw message:', message);
             const msg = JSON.parse(message.body);
-            const currentMessages = this.messageSubject.value;
-            this.messageSubject.next([...currentMessages, msg]);
+            console.log('Parsed message:', msg);
+            try {
+              const decryptedContent = this.encryptionService.decryptMessage(
+                msg.encryptedContent,
+                msg.sender
+              );
+              console.log('Decrypted content:', decryptedContent);
+              const decryptedMsg = {
+                ...msg,
+                content: decryptedContent,
+                timestamp: new Date(),
+                isUser: msg.sender === this.currentUser
+              };
+              console.log('Final message object:', decryptedMsg);
+              const currentMessages = this.messageSubject.value;
+              console.log('Current messages:', currentMessages);
+              this.messageSubject.next([...currentMessages, decryptedMsg]);
+              console.log('Updated messages:', this.messageSubject.value);
+            } catch (error) {
+              console.error('Error decrypting message:', error);
+            }
+          });
+
+          // Subscribe to user list updates
+          this.stompClient?.subscribe('/topic/users', (message: IMessage) => {
+            console.log('Received user list update:', message);
+            const users = JSON.parse(message.body);
+            this.usersSubject.next(users);
+          });
+
+          // Subscribe to public key updates
+          this.stompClient?.subscribe('/topic/public-keys', (message: IMessage) => {
+            console.log('Received public key update:', message);
+            const userData = JSON.parse(message.body);
+            if (userData.username !== this.currentUser) {
+              this.encryptionService.generateSharedKey(userData.publicKey, userData.username);
+            }
           });
         },
         onStompError: (frame) => {
           console.error('STOMP error:', frame);
-          this.isConnecting = false;
-          this.connectionStatus.next('Error');
-          this.scheduleReconnect();
+          this.handleConnectionError();
         },
         onWebSocketError: (event) => {
           console.error('WebSocket error:', event);
-          this.isConnecting = false;
-          this.connectionStatus.next('Error');
-          this.scheduleReconnect();
+          this.handleConnectionError();
         },
         onWebSocketClose: () => {
           console.log('WebSocket connection closed');
-          this.isConnecting = false;
-          this.connectionStatus.next('Disconnected');
-          this.scheduleReconnect();
+          this.handleConnectionError();
         }
       });
 
@@ -69,9 +113,21 @@ export class ChatService {
       this.stompClient.activate();
     } catch (e) {
       console.error('Connection error:', e);
-      this.isConnecting = false;
-      this.connectionStatus.next('Error');
+      this.handleConnectionError();
+    }
+  }
+
+  private handleConnectionError(): void {
+    this.isConnecting = false;
+    this.connectionStatus.next('Error');
+    
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
       this.scheduleReconnect();
+    } else {
+      console.error('Max reconnection attempts reached');
+      this.connectionStatus.next('Failed to connect');
     }
   }
 
@@ -80,30 +136,65 @@ export class ChatService {
       clearTimeout(this.reconnectTimeout);
     }
     this.reconnectTimeout = setTimeout(() => {
-      console.log('Attempting to reconnect...');
       this.connect();
     }, 5000);
   }
 
-  sendMessage(sender: string, content: string): void {
+  registerUser(username: string): void {
     if (!this.stompClient?.connected) {
-      console.error('Not connected to WebSocket');
-      this.connectionStatus.next('Error');
-      return;
+      throw new Error('Not connected to WebSocket');
     }
-    // encrypt
-    const msg = {
-      sender: sender,
-      content: content.trim()
-    };
+
+    const publicKey = this.encryptionService.getPublicKey();
+    this.currentUser = username;
+
+    this.stompClient.publish({
+      destination: '/app/register',
+      body: JSON.stringify({ username, publicKey }),
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  connectToUser(username: string): void {
+    if (!this.stompClient?.connected) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    this.currentReceiver = username;
     
+    // Request public key for the selected user
+    this.stompClient.publish({
+      destination: '/app/request-public-key',
+      body: JSON.stringify({ username }),
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  sendMessage(content: string): void {
+    if (!this.stompClient?.connected) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    if (!this.currentReceiver) {
+      throw new Error('No receiver selected');
+    }
+
     try {
+      const encryptedContent = this.encryptionService.encryptMessage(content, this.currentReceiver);
+      const msg = {
+        sender: this.currentUser,
+        receiver: this.currentReceiver,
+        content: content.trim(),
+        encryptedContent,
+        senderPublicKey: this.encryptionService.getPublicKey(),
+        timestamp: new Date()
+      };
+      
+      console.log('Sending message:', msg);
       this.stompClient.publish({
         destination: '/app/chat',
         body: JSON.stringify(msg),
-        headers: {
-          'content-type': 'application/json'
-        }
+        headers: { 'content-type': 'application/json' }
       });
       console.log('Message sent successfully');
     } catch (error) {
@@ -112,12 +203,20 @@ export class ChatService {
     }
   }
 
-  getMessages(): Observable<{ sender: string; content: string }[]> {
+  getMessages(): Observable<Message[]> {
     return this.messageSubject.asObservable();
+  }
+
+  getUsers(): Observable<User[]> {
+    return this.usersSubject.asObservable();
   }
 
   getConnectionStatus(): Observable<string> {
     return this.connectionStatus.asObservable();
+  }
+
+  getCurrentReceiver(): string {
+    return this.currentReceiver;
   }
 
   disconnect(): void {
