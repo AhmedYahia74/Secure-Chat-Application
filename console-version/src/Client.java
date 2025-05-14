@@ -4,9 +4,11 @@ import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.Scanner;
+
 public class Client implements Runnable{
     private String clientName = null;
     private Socket socket = null;
+    
     private Scanner inputStream = null;
     private PrintWriter outputStream = null;
     private BufferedReader response = null;
