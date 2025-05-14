@@ -32,9 +32,9 @@ export class ChatService {
     try {
       this.isConnecting = true;
       console.log('Attempting to connect to WebSocket...');
-      
+
       const socket = new SockJS('http://localhost:8080/chat');
-      
+
       this.stompClient = new Client({
         webSocketFactory: () => socket,
         connectHeaders: {
@@ -51,7 +51,7 @@ export class ChatService {
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.connectionStatus.next('Connected');
-          
+
           // Subscribe to personal messages
           this.stompClient?.subscribe(`/user/${this.currentUser}/queue/messages`, (message: IMessage) => {
             console.log('Received raw message:', message);
@@ -71,11 +71,18 @@ export class ChatService {
               };
               console.log('Final message object:', decryptedMsg);
               const currentMessages = this.messageSubject.value;
-              console.log('Current messages:', currentMessages);
-              this.messageSubject.next([...currentMessages, decryptedMsg]);
-              console.log('Updated messages:', this.messageSubject.value);
+              console.log('Current messages before update:', currentMessages);
+              const updatedMessages = [...currentMessages, decryptedMsg];
+              console.log('Updated messages array:', updatedMessages);
+              this.messageSubject.next(updatedMessages);
+              console.log('Message subject updated with new value:', this.messageSubject.value);
             } catch (error) {
-              console.error('Error decrypting message:', error);
+              console.error('Error processing message:', error);
+              console.error('Error details:', {
+                message: msg,
+                currentUser: this.currentUser,
+                error: error
+              });
             }
           });
 
@@ -120,7 +127,7 @@ export class ChatService {
   private handleConnectionError(): void {
     this.isConnecting = false;
     this.connectionStatus.next('Error');
-    
+
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
@@ -161,7 +168,7 @@ export class ChatService {
     }
 
     this.currentReceiver = username;
-    
+
     // Request public key for the selected user
     this.stompClient.publish({
       destination: '/app/request-public-key',
@@ -189,7 +196,7 @@ export class ChatService {
         senderPublicKey: this.encryptionService.getPublicKey(),
         timestamp: new Date()
       };
-      
+
       console.log('Sending message:', msg);
       this.stompClient.publish({
         destination: '/app/chat',

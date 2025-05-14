@@ -29,13 +29,15 @@ export class ChatComponent implements OnInit, OnDestroy {
   constructor(
     private chatService: ChatService,
     @Inject(PLATFORM_ID) private platformId: Object
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     console.log('Initializing chat component');
     this.messagesSubscription = this.chatService.getMessages().subscribe(
       messages => {
         console.log('Received messages update:', messages);
+        console.log('Current messages array length:', messages.length);
+        console.log('Messages content:', JSON.stringify(messages, null, 2));
         this.messages = messages;
         if (isPlatformBrowser(this.platformId)) {
           setTimeout(() => {
@@ -45,6 +47,9 @@ export class ChatComponent implements OnInit, OnDestroy {
             }
           });
         }
+      },
+      error => {
+        console.error('Error in messages subscription:', error);
       }
     );
 
