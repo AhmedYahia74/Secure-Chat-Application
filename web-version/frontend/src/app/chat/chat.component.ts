@@ -33,40 +33,21 @@ export class ChatComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
-    console.log('Initializing chat component');
     this.messagesSubscription = this.chatService.getMessages().subscribe({
       next: (messages) => {
-        console.log('Received messages update in component:', messages);
-        console.log('Current messages array length:', messages.length);
-        console.log('Messages content:', JSON.stringify(messages, null, 2));
-
         // Ensure messages are properly sorted by timestamp
         this.messages = [...messages].sort((a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
 
-        console.log('Sorted messages:', this.messages);
-        console.log('Messages array after update:', this.messages);
-        console.log('Component messages array:', this.messages);
-        console.log('Component messages length:', this.messages.length);
-
         // Force change detection
         this.cdr.detectChanges();
-
-        setTimeout(() => {
-          console.log('Checking messages after timeout:', this.messages);
-          console.log('Messages div exists:', !!document.querySelector('.chat-messages'));
-          console.log('Message elements count:', document.querySelectorAll('.message').length);
-        });
 
         if (isPlatformBrowser(this.platformId)) {
           setTimeout(() => {
             const messagesDiv = document.querySelector('.chat-messages');
             if (messagesDiv) {
               messagesDiv.scrollTop = messagesDiv.scrollHeight;
-              console.log('Scrolled to bottom of messages');
-            } else {
-              console.warn('Messages div not found');
             }
           });
         }
@@ -79,7 +60,6 @@ export class ChatComponent implements OnInit, OnDestroy {
 
     this.statusSubscription = this.chatService.getConnectionStatus().subscribe(
       status => {
-        console.log('Connection status update:', status);
         this.status = status;
         if (status === 'Error') {
           this.error = 'Connection error. Attempting to reconnect...';
@@ -92,7 +72,6 @@ export class ChatComponent implements OnInit, OnDestroy {
 
     this.usersSubscription = this.chatService.getUsers().subscribe(
       users => {
-        console.log('Users update:', users);
         this.users = users;
         this.cdr.detectChanges();
       }

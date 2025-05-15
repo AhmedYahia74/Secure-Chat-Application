@@ -176,30 +176,14 @@ export class EncryptionService {
   }
 
   async generateSharedKey(publicKeyJwk: JsonWebKey, username: string): Promise<void> {
-    console.log('Generating shared key for user:', username, 'with public key:', publicKeyJwk);
     if (!this.keyPair?.privateKey) {
       throw new Error('Private key not initialized');
     }
 
     try {
       const theirPublicKey = await this.importPublicKey(publicKeyJwk);
-      console.log('Imported public key for user:', username, {
-        type: theirPublicKey.type,
-        algorithm: theirPublicKey.algorithm,
-        extractable: theirPublicKey.extractable,
-        usages: theirPublicKey.usages
-      });
-
       const sharedKey = await this.deriveSharedKey(this.keyPair.privateKey, theirPublicKey);
-      console.log('Derived shared key for user:', username, {
-        type: sharedKey.type,
-        algorithm: sharedKey.algorithm,
-        extractable: sharedKey.extractable,
-        usages: sharedKey.usages
-      });
-
       this.sharedKeys.set(username, sharedKey);
-      console.log('Stored shared key for user:', username);
     } catch (error) {
       console.error('Error generating shared key:', error);
       throw error;
@@ -207,12 +191,6 @@ export class EncryptionService {
   }
 
   getSharedKey(username: string): CryptoKey | undefined {
-    const key = this.sharedKeys.get(username);
-    console.log('Retrieving shared key for user:', username, {
-      keyFound: !!key,
-      keyType: key?.type,
-      keyAlgorithm: key?.algorithm
-    });
-    return key;
+    return this.sharedKeys.get(username);
   }
 }
