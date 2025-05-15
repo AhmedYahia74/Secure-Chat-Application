@@ -4,13 +4,14 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { EncryptionService } from './encryption.service';
 import { Message, User } from './models';
+import { map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ChatService {
   private stompClient: Client | null = null;
-  private messageSubject = new BehaviorSubject<Message[]>([]);
+  private messageSubject = new BehaviorSubject<Map<string, Message[]>>(new Map());
   private connectionStatus = new BehaviorSubject<string>('Disconnected');
   private usersSubject = new BehaviorSubject<User[]>([]);
   private currentUser: string = '';
@@ -152,9 +153,7 @@ export class ChatService {
                         isUser: false
                       };
 
-                      const currentMessages = this.messageSubject.value;
-                      const updatedMessages = [...currentMessages, decryptedMsg];
-                      this.messageSubject.next(updatedMessages);
+                      this.addMessageToConversation(decryptedMsg);
                     } catch (error) {
                       console.error('Error decrypting message:', error);
                       throw error;
@@ -247,6 +246,58 @@ export class ChatService {
     });
   }
 
+  private getConversationKey(sender: string, receiver: string): string {
+    // Sort usernames to ensure consistent conversation key regardless of who is sender/receiver
+    return [sender, receiver].sort().join('_');
+  }
+
+  private addMessageToConversation(message: Message): void {
+    const currentMessages = this.messageSubject.value;
+    const conversationKey = this.getConversationKey(message.sender, message.receiver);
+
+    const conversationMessages = currentMessages.get(conversationKey) || [];
+    const updatedMessages = [...conversationMessages, message];
+
+    const updatedConversations = new Map(currentMessages);
+    updatedConversations.set(conversationKey, updatedMessages);
+
+    this.messageSubject.next(updatedConversations);
+  }
+
+  getMessages(): Observable<Map<string, Message[]>> {
+    return this.messageSubject.asObservable();
+  }
+
+  getConversationMessages(sender: string, receiver: string): Observable<Message[]> {
+    return this.messageSubject.pipe(
+      map(conversations => {
+        const conversationKey = this.getConversationKey(sender, receiver);
+        return conversations.get(conversationKey) || [];
+      })
+    );
+  }
+
+  getUsers(): Observable<User[]> {
+    return this.usersSubject.asObservable();
+  }
+
+  getConnectionStatus(): Observable<string> {
+    return this.connectionStatus.asObservable();
+  }
+
+  getCurrentReceiver(): string {
+    return this.currentReceiver;
+  }
+
+  disconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    if (this.stompClient) {
+      this.stompClient.deactivate();
+    }
+  }
+
   sendMessage(content: string): void {
     if (!this.stompClient?.connected) {
       throw new Error('Not connected to WebSocket');
@@ -281,9 +332,7 @@ export class ChatService {
             headers: { 'content-type': 'application/json' }
           });
 
-          const currentMessages = this.messageSubject.value;
-          const updatedMessages = [...currentMessages, msg];
-          this.messageSubject.next(updatedMessages);
+          this.addMessageToConversation(msg);
         })
         .catch(error => {
           console.error('Error encrypting message:', error);
@@ -292,31 +341,6 @@ export class ChatService {
     } catch (error) {
       console.error('Error sending message:', error);
       this.connectionStatus.next('Error');
-    }
-  }
-
-  getMessages(): Observable<Message[]> {
-    return this.messageSubject.asObservable();
-  }
-
-  getUsers(): Observable<User[]> {
-    return this.usersSubject.asObservable();
-  }
-
-  getConnectionStatus(): Observable<string> {
-    return this.connectionStatus.asObservable();
-  }
-
-  getCurrentReceiver(): string {
-    return this.currentReceiver;
-  }
-
-  disconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-    }
-    if (this.stompClient) {
-      this.stompClient.deactivate();
     }
   }
 } 

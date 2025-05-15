@@ -34,22 +34,16 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.messagesSubscription = this.chatService.getMessages().subscribe({
-      next: (messages) => {
-        // Ensure messages are properly sorted by timestamp
-        this.messages = [...messages].sort((a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-
-        // Force change detection
-        this.cdr.detectChanges();
-
-        if (isPlatformBrowser(this.platformId)) {
-          setTimeout(() => {
-            const messagesDiv = document.querySelector('.chat-messages');
-            if (messagesDiv) {
-              messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            }
-          });
+      next: (conversations) => {
+        if (this.selectedUser) {
+          this.chatService.getConversationMessages(this.username, this.selectedUser)
+            .subscribe(messages => {
+              this.messages = messages.sort((a, b) =>
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+              );
+              this.cdr.detectChanges();
+              this.scrollToBottom();
+            });
         }
       },
       error: (error) => {
@@ -78,6 +72,17 @@ export class ChatComponent implements OnInit, OnDestroy {
     );
   }
 
+  private scrollToBottom(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      setTimeout(() => {
+        const messagesDiv = document.querySelector('.chat-messages');
+        if (messagesDiv) {
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+      });
+    }
+  }
+
   startChat(): void {
     if (!this.username.trim()) {
       this.error = 'Please enter a username';
@@ -101,7 +106,16 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.chatService.connectToUser(username);
       this.selectedUser = username;
       this.error = '';
-      this.cdr.detectChanges();
+
+      // Load conversation messages when selecting a user
+      this.chatService.getConversationMessages(this.username, username)
+        .subscribe(messages => {
+          this.messages = messages.sort((a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+          this.cdr.detectChanges();
+          this.scrollToBottom();
+        });
     } catch (error) {
       console.error('Failed to connect to user:', error);
       this.error = 'Failed to connect to user';
