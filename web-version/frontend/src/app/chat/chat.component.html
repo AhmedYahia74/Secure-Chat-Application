@@ -20,7 +20,10 @@
         <h3>Online Users</h3>
         <div class="user-item" *ngFor="let user of users" [class.selected]="user.username === selectedUser"
           (click)="connectToUser(user.username)">
-          {{ user.username }}
+          <span class="username">{{ user.username }}</span>
+          <span class="unread-badge" *ngIf="getUnreadCount(user.username) > 0">
+            {{ getUnreadCount(user.username) }}
+          </span>
         </div>
       </div>
 

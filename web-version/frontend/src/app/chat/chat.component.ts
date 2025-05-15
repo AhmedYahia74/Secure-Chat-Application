@@ -21,10 +21,13 @@ export class ChatComponent implements OnInit, OnDestroy {
   error: string = '';
   showChat: boolean = false;
   selectedUser: string = '';
+  unreadMessages: Map<string, number> = new Map();
+  private messagesContainer: HTMLElement | null = null;
 
   private messagesSubscription: Subscription | null = null;
   private statusSubscription: Subscription | null = null;
   private usersSubscription: Subscription | null = null;
+  private unreadMessagesSubscription: Subscription | null = null;
 
   constructor(
     private chatService: ChatService,
@@ -33,6 +36,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      // Get reference to messages container
+      this.messagesContainer = document.querySelector('.chat-messages');
+    }
+
     this.messagesSubscription = this.chatService.getMessages().subscribe({
       next: (conversations) => {
         if (this.selectedUser) {
@@ -70,14 +78,26 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     );
+
+    this.unreadMessagesSubscription = this.chatService.getUnreadMessages().subscribe(
+      unread => {
+        this.unreadMessages = unread;
+        this.cdr.detectChanges();
+      }
+    );
   }
 
   private scrollToBottom(): void {
     if (isPlatformBrowser(this.platformId)) {
       setTimeout(() => {
-        const messagesDiv = document.querySelector('.chat-messages');
-        if (messagesDiv) {
-          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        if (this.messagesContainer) {
+          const shouldAutoScroll =
+            this.messagesContainer.scrollHeight - this.messagesContainer.scrollTop
+            <= this.messagesContainer.clientHeight + 100; // Auto-scroll if within 100px of bottom
+
+          if (shouldAutoScroll) {
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+          }
         }
       });
     }
@@ -142,10 +162,15 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.content = '';
       this.error = '';
       this.cdr.detectChanges();
+      this.scrollToBottom();
     } catch (error) {
       console.error('Failed to send message:', error);
       this.error = 'Failed to send message';
     }
+  }
+
+  getUnreadCount(username: string): number {
+    return this.unreadMessages.get(username) || 0;
   }
 
   ngOnDestroy(): void {
@@ -158,6 +183,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
     if (this.usersSubscription) {
       this.usersSubscription.unsubscribe();
+    }
+    if (this.unreadMessagesSubscription) {
+      this.unreadMessagesSubscription.unsubscribe();
     }
   }
 }

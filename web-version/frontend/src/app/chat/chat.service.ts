@@ -14,6 +14,7 @@ export class ChatService {
   private messageSubject = new BehaviorSubject<Map<string, Message[]>>(new Map());
   private connectionStatus = new BehaviorSubject<string>('Disconnected');
   private usersSubject = new BehaviorSubject<User[]>([]);
+  private unreadMessagesSubject = new BehaviorSubject<Map<string, number>>(new Map());
   private currentUser: string = '';
   private currentReceiver: string = '';
   private isConnecting = false;
@@ -238,6 +239,7 @@ export class ChatService {
     }
 
     this.currentReceiver = username;
+    this.markMessagesAsRead(username);
 
     this.stompClient.publish({
       destination: '/app/request-public-key',
@@ -262,6 +264,15 @@ export class ChatService {
     updatedConversations.set(conversationKey, updatedMessages);
 
     this.messageSubject.next(updatedConversations);
+
+    // Update unread messages count
+    if (message.receiver === this.currentUser && message.sender !== this.currentReceiver) {
+      const currentUnread = this.unreadMessagesSubject.value;
+      const updatedUnread = new Map(currentUnread);
+      const currentCount = updatedUnread.get(message.sender) || 0;
+      updatedUnread.set(message.sender, currentCount + 1);
+      this.unreadMessagesSubject.next(updatedUnread);
+    }
   }
 
   getMessages(): Observable<Map<string, Message[]>> {
@@ -342,5 +353,16 @@ export class ChatService {
       console.error('Error sending message:', error);
       this.connectionStatus.next('Error');
     }
+  }
+
+  getUnreadMessages(): Observable<Map<string, number>> {
+    return this.unreadMessagesSubject.asObservable();
+  }
+
+  markMessagesAsRead(sender: string): void {
+    const currentUnread = this.unreadMessagesSubject.value;
+    const updatedUnread = new Map(currentUnread);
+    updatedUnread.set(sender, 0);
+    this.unreadMessagesSubject.next(updatedUnread);
   }
 } 
